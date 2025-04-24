@@ -1,11 +1,31 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
-const historySchema = new mongoose.Schema({
-  itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Post' },
-  itemName: { type: String, required: true },
-  action: { type: String, enum: ['add', 'remove'], required: true },
-  quantity: { type: Number, required: true },
-  timestamp: { type: Date, default: Date.now }
+const HistorySchema = new mongoose.Schema({
+  itemId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+  },
+  itemName: {
+    type: String,
+    required: true,
+  },
+  action: {
+    type: String,
+    enum: ['add', 'remove', 'edit'],
+    required: true,
+  },
+  quantity: {
+    type: Number,
+    required: true,
+  },
+  requester: {
+    type: String,
+    required: true, // บังคับให้มีชื่อผู้เบิก
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
-module.exports = mongoose.model('History', historySchema);
+export default mongoose.models.History || mongoose.model('History', HistorySchema);

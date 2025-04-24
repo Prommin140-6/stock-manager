@@ -71,10 +71,62 @@ export default function Home() {
   const updateQuantity = async (id, change) => {
     setLoading(true);
     try {
+      const { value: formValues } = await Swal.fire({
+        title: change > 0 ? 'เพิ่มจำนวนสินค้า' : 'ลดจำนวนสินค้า',
+        html: `
+          <input type="number" id="quantity" class="swal2-input" placeholder="จำนวน" min="1" value="1">
+          <input type="text" id="requester" class="swal2-input" placeholder="ชื่อผู้เบิก">
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'ตกลง',
+        cancelButtonText: 'ยกเลิก',
+        preConfirm: () => {
+          const quantityInput = document.getElementById('quantity').value;
+          const requesterInput = document.getElementById('requester').value.trim();
+
+          if (!quantityInput || quantityInput <= 0) {
+            Swal.showValidationMessage('กรุณากรอกจำนวนที่มากกว่า 0');
+            return false;
+          }
+          if (!requesterInput) {
+            Swal.showValidationMessage('กรุณากรอกชื่อผู้เบิก');
+            return false;
+          }
+
+          return {
+            quantity: parseInt(quantityInput),
+            requester: requesterInput,
+          };
+        },
+        didOpen: () => {
+          const confirmButton = Swal.getConfirmButton();
+          const quantityInput = document.getElementById('quantity');
+          const requesterInput = document.getElementById('requester');
+
+          const validateInputs = () => {
+            const quantity = quantityInput.value;
+            const requester = requesterInput.value.trim();
+            confirmButton.disabled = !quantity || quantity <= 0 || !requester;
+          };
+
+          quantityInput.addEventListener('input', validateInputs);
+          requesterInput.addEventListener('input', validateInputs);
+          validateInputs();
+        },
+      });
+
+      if (!formValues) {
+        setLoading(false);
+        return;
+      }
+
+      const { quantity, requester } = formValues;
+
       const response = await fetch('/api/posts', {
         method: change > 0 ? 'PUT' : 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, quantity: Math.abs(change) }),
+        body: JSON.stringify({ id, quantity: Math.abs(quantity * change), requester }),
       });
 
       if (!response.ok) {
@@ -126,11 +178,39 @@ export default function Home() {
       console.log('Delete confirmed for item:', item);
       setLoading(true);
       try {
+        const { value: requester } = await Swal.fire({
+          title: 'กรอกชื่อผู้เบิก',
+          input: 'text',
+          inputLabel: 'ชื่อผู้เบิก',
+          inputPlaceholder: 'กรอกชื่อผู้เบิก',
+          showCancelButton: true,
+          confirmButtonText: 'ตกลง',
+          cancelButtonText: 'ยกเลิก',
+          inputValidator: (value) => {
+            if (!value.trim()) {
+              return 'กรุณากรอกชื่อผู้เบิก';
+            }
+          },
+          didOpen: () => {
+            const confirmButton = Swal.getConfirmButton();
+            const input = Swal.getInput();
+            confirmButton.disabled = true;
+            input.addEventListener('input', () => {
+              confirmButton.disabled = !input.value.trim();
+            });
+          },
+        });
+
+        if (!requester) {
+          setLoading(false);
+          return;
+        }
+
         console.log('Sending DELETE request for item:', item._id);
         const response = await fetch('/api/posts', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: item._id }), // ส่งเฉพาะ id
+          body: JSON.stringify({ id: item._id, requester }),
         });
 
         console.log('Response status:', response.status);
@@ -147,7 +227,6 @@ export default function Home() {
         const data = await response.json();
         console.log('DELETE response:', data);
 
-        // อัปเดต state ทันที
         const updatedItems = items.filter(i => i._id !== item._id);
         setItems(updatedItems);
         const updatedFilteredItems = filteredItems.filter(i => i._id !== item._id);
@@ -242,7 +321,7 @@ export default function Home() {
             return (
               <div
                 key={item._id}
-                className={`border rounded p-3 shadow ${
+                className={`border那么: 'border rounded p-3 shadow ${
                   item.quantity < 5 && item.quantity > 0 ? 'bg-red-100' : item.quantity === 0 ? 'bg-gray-100' : ''
                 }`}
               >
@@ -250,7 +329,7 @@ export default function Home() {
                   <img
                     src={item.image}
                     alt={item.name}
-                    className="h-24 w-full object-cover mb-1 rounded"
+                    className="h-40 w-full object-cover mb-1 rounded"
                   />
                 )}
                 <h2 className="text-base font-semibold truncate">{item.name}</h2>
@@ -262,14 +341,14 @@ export default function Home() {
                     onClick={() => updateQuantity(item._id, 1)}
                     className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs"
                   >
-                    + เพิ่ม
+                    + เติม
                   </button>
                   <button
                     onClick={() => updateQuantity(item._id, -1)}
                     className="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs"
                     disabled={item.quantity === 0}
                   >
-                    - ลด
+                    - เบิก
                   </button>
                   <button
                     onClick={() => router.push(`/edit/${item._id}`)}

@@ -31,7 +31,8 @@ export async function POST(req) {
       itemName: newPost.name,
       action: 'add',
       quantity: data.quantity,
-      timestamp: new Date()
+      requester: 'ระบบ', // เนื่องจากหน้า /create ยังไม่รองรับการกรอกชื่อผู้เพิ่ม
+      timestamp: new Date(),
     });
     await historyEntry.save();
     console.log('History entry created on POST:', historyEntry);
@@ -49,7 +50,14 @@ export async function POST(req) {
 export async function PUT(req) {
   try {
     await connectMongo();
-    const { id, quantity } = await req.json();
+    const { id, quantity, requester } = await req.json();
+
+    if (!requester) {
+      return NextResponse.json(
+        { error: 'Requester is required' },
+        { status: 400 }
+      );
+    }
 
     const post = await Post.findById(id);
     if (!post) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -62,7 +70,8 @@ export async function PUT(req) {
       itemName: post.name,
       action: 'add',
       quantity: Math.abs(change),
-      timestamp: new Date()
+      requester,
+      timestamp: new Date(),
     });
     await historyEntry.save();
     console.log('History entry created on PUT:', historyEntry);
@@ -82,15 +91,21 @@ export async function PUT(req) {
 export async function DELETE(req) {
   try {
     await connectMongo();
-    const { id, quantity } = await req.json();
+    const { id, quantity, requester } = await req.json();
+
+    if (!requester) {
+      return NextResponse.json(
+        { error: 'Requester is required' },
+        { status: 400 }
+      );
+    }
 
     const post = await Post.findById(id);
     if (!post) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     console.log('Post before update:', post);
-    console.log('DELETE request data:', { id, quantity }); // เพิ่ม log เพื่อตรวจสอบข้อมูลที่ส่งมา
+    console.log('DELETE request data:', { id, quantity, requester });
 
-    // ถ้า quantity ไม่ถูกส่งมา (กรณีลบทั้งหมดจากปุ่ม "ลบ")
     if (quantity === undefined || quantity === null) {
       console.log('Performing full deletion for post:', post._id);
       const historyEntry = new History({
@@ -98,7 +113,8 @@ export async function DELETE(req) {
         itemName: post.name,
         action: 'remove',
         quantity: post.quantity,
-        timestamp: new Date()
+        requester,
+        timestamp: new Date(),
       });
       await historyEntry.save();
       console.log('History entry created on DELETE (full removal):', historyEntry);
@@ -109,7 +125,6 @@ export async function DELETE(req) {
       return NextResponse.json({ message: "Deleted" }, { status: 200 });
     }
 
-    // กรณีลดจำนวน (จากปุ่ม "ลด")
     console.log('Performing quantity decrease for post:', post._id);
     post.quantity -= quantity;
     if (post.quantity < 0) post.quantity = 0;
@@ -119,7 +134,8 @@ export async function DELETE(req) {
       itemName: post.name,
       action: 'remove',
       quantity: Math.abs(quantity),
-      timestamp: new Date()
+      requester,
+      timestamp: new Date(),
     });
     await historyEntry.save();
     console.log('History entry created on DELETE (partial removal):', historyEntry);
